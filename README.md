@@ -1,11 +1,47 @@
 
+# 语言篇
+
 [数据库篇](db.md)  
 
 [通用技术篇](common.md)
 
 [中间件篇](mid.md)
 
-# 语言篇
+- [语言篇](#语言篇)
+  - [参考](#参考)
+    - [1.Golang中除了加Mutex锁以外还有哪些方式安全读写共享变量？](#1golang中除了加mutex锁以外还有哪些方式安全读写共享变量)
+    - [2.无缓冲 Chan 的发送和接收是否同步?](#2无缓冲-chan-的发送和接收是否同步)
+    - [3.GMP调度模型,尽可能的详细](#3gmp调度模型尽可能的详细)
+    - [4.JSON 标准库对 nil slice 和 空 slice 的处理是一致的吗？](#4json-标准库对-nil-slice-和-空-slice-的处理是一致的吗)
+    - [5.协程，线程，进程的区别](#5协程线程进程的区别)
+    - [6.互斥锁，读写锁，死锁问题,怎么解决](#6互斥锁读写锁死锁问题怎么解决)
+    - [7.三色标记法](#7三色标记法)
+    - [8.什么是data race? data Race问题怎么解决？能不能不加锁解决这个问题？](#8什么是data-race-data-race问题怎么解决能不能不加锁解决这个问题)
+    - [9.什么是channel，为什么它可以做到线程安全？](#9什么是channel为什么它可以做到线程安全)
+    - [10.怎么查看Goroutine的数量?](#10怎么查看goroutine的数量)
+    - [11. map是并发安全的吗？怎么解决并发安全问题？](#11-map是并发安全的吗怎么解决并发安全问题)
+    - [12.go struct能不能比较](#12go-struct能不能比较)
+    - [13.主协程如何等其余协程完再操作?](#13主协程如何等其余协程完再操作)
+    - [14.切片的实现?](#14切片的实现)
+    - [15.map如何顺序读取?](#15map如何顺序读取)
+    - [16.什么是结构体tag，怎么用?](#16什么是结构体tag怎么用)
+    - [17.slice深拷贝和浅拷贝](#17slice深拷贝和浅拷贝)
+    - [18.map触发扩容的时机，满足什么条件时扩容？](#18map触发扩容的时机满足什么条件时扩容)
+    - [19.make和new什么区别?](#19make和new什么区别)
+    - [20.pprof怎么使用？什么是火焰图?](#20pprof怎么使用什么是火焰图)
+    - [21.数组与切片的区别?](#21数组与切片的区别)
+    - [22.beego和gin的区别?为什么gin比beego要快?](#22beego和gin的区别为什么gin比beego要快)
+    - [23.defer的原理](#23defer的原理)
+      - [defer扩展](#defer扩展)
+    - [24.什么是cas？Go中CAS是怎么回事？](#24什么是casgo中cas是怎么回事)
+    - [25.Go值接收者和指针接收者的区别？](#25go值接收者和指针接收者的区别)
+    - [26.Goroutine发生了泄漏如何检测？](#26goroutine发生了泄漏如何检测)
+    - [27.为何GPM调度要有P?](#27为何gpm调度要有p)
+    - [28.什么是闭包？什么是闭包的延迟加载?](#28什么是闭包什么是闭包的延迟加载)
+    - [29.如何限制goroutine的数量?控制在多少个比较合适?](#29如何限制goroutine的数量控制在多少个比较合适)
+    - [30.互斥锁有几种模式?](#30互斥锁有几种模式)
+    - [31.go中的逃逸分析是什么?](#31go中的逃逸分析是什么)
+    - [32.sync.Pool用过吗?是怎么用的?](#32syncpool用过吗是怎么用的)
 
 ## 参考
 
@@ -21,14 +57,14 @@ Golang中Goroutine 可以通过 Channel 进行安全读写共享变量,还可以
 
 `ch := make(chan int)`无缓冲的channel由于没有缓冲发送和接收需要同步.  
 
-`ch := make(chan int, 2) `有缓冲channel不要求发送和接收操作同步.   
+`ch := make(chan int, 2)`有缓冲channel不要求发送和接收操作同步.
 
 channel无缓冲时，发送阻塞直到数据被接收，接收阻塞直到读到数据。
 channel有缓冲时，当缓冲满时发送阻塞，当缓冲空时接收阻塞。
 
 ### 3.GMP调度模型,尽可能的详细
 
-https://github.com/lifei6671/interview-go/blob/master/base/go-gpm.md  
+<https://github.com/lifei6671/interview-go/blob/master/base/go-gpm.md>  
 
 CSP用于描述两个独立的并发实体通过共享的通讯channel进行通讯的并发模型
 在GO中并发实体就是goroutine,他是一种运行在用户态的轻量级线程,由go的调度器进行调度;channel在go中是
@@ -41,8 +77,6 @@ G代表的就是goroutine,M代表的是内核线程,P代表的是GM运行所需�
 当M执行的G进行了系统调用会怎么办?
     此刻M会跟着进入系统调用的状态,此时的P会和当前的M解绑,转而去找其他空闲的M来执行其余的G
 
-
-
 ### 4.JSON 标准库对 nil slice 和 空 slice 的处理是一致的吗？
 
 不一致;
@@ -51,7 +85,7 @@ G代表的就是goroutine,M代表的是内核线程,P代表的是GM运行所需�
 
 ### 5.协程，线程，进程的区别
 
-https://www.topgoer.cn/docs/golangxiuyang/golangxiuyang-1cmef1pfu03cf
+<https://www.topgoer.cn/docs/golangxiuyang/golangxiuyang-1cmef1pfu03cf>
 
 ### 6.互斥锁，读写锁，死锁问题,怎么解决
 
@@ -64,7 +98,6 @@ https://www.topgoer.cn/docs/golangxiuyang/golangxiuyang-1cmef1pfu03cf
 - 不剥夺条件：进程已获得的资源在未使用完之前，不能剥夺，只能在使用完时由自己释放。
 - 环路等待条件：在发生死锁时，必然存在一个进程--资源的环形链。
 
-
 互斥锁:多个协程同时操作一个变量可能会出现错误,互斥锁可以使的在一个协程操作时,其他所有协程无法对其操作,保证
 线程安全,但也造成一个问题,其他协程都在不断的进行激烈的锁竞争
 读写锁:某些协程并不是都会对同一个变量执行写入操作,因此读写锁能够降低性能消耗(读写间互斥,多个读取直接不互斥,
@@ -72,7 +105,7 @@ https://www.topgoer.cn/docs/golangxiuyang/golangxiuyang-1cmef1pfu03cf
 
 ### 7.三色标记法
 
-https://zhuanlan.zhihu.com/p/105495961
+<https://zhuanlan.zhihu.com/p/105495961>
 
 ### 8.什么是data race? data Race问题怎么解决？能不能不加锁解决这个问题？
 
@@ -80,12 +113,10 @@ https://zhuanlan.zhihu.com/p/105495961
 三方面解决:1.不要让多个协程同时具备改写同意变量的能力,可设置为一个协程修改,其余协程
 向该协程传送数据;2,可以使用带缓冲1的channel实现互斥锁的功能;3,使用并发安全的写入方式,如原子操作以及sync.map
 
-
 ### 9.什么是channel，为什么它可以做到线程安全？
 
 channel是go中的一个核心类型,可以把他看做是一个管道,先进先出的队列,在channel中,
 发送一个数据和接收一个数据都是原子性的,用于在多个协程间通信,所以其本身就是线程安全的,channel底层用了互斥锁来保证并发安全
-
 
 ### 10.怎么查看Goroutine的数量?
 
@@ -104,6 +135,7 @@ map不是并发安全的;
 结论:struct可以比较,**前提是他所有的字段都有可比性**,如果他们对应的非空字段相等,则两个结构体相等  
 
 拓展:  
+
 - slice,map,function这些是不能比较的,但也有特殊情况:他们都是nil时可以和nil进行比较,其余类型均是可以比较的  
 
 - 同种类型的map可以比较;chan指向同一个通道即为true(两个chan被同一个make创建),也可以和nil比较
@@ -127,7 +159,7 @@ map不是并发安全的;
 
 ### 16.什么是结构体tag，怎么用?
 
-https://zhuanlan.zhihu.com/p/258978922  
+<https://zhuanlan.zhihu.com/p/258978922>  
 
 每个struct成员后面的用单引号标示的内容，它的定义永远都是以key-value的形式出现的,
 比如在在序列化时,序列化的包会读取tag内容，对json结果进行重命名输出,或是增加某些属性,
@@ -136,7 +168,7 @@ https://zhuanlan.zhihu.com/p/258978922
 
 ### 17.slice深拷贝和浅拷贝
 
-https://mp.weixin.qq.com/s/uSOBfOLN4j3_VQtxHtJEWQ  
+<https://mp.weixin.qq.com/s/uSOBfOLN4j3_VQtxHtJEWQ>  
 
 1. 深拷贝（Deep Copy）：
 拷贝的是数据本身，创造一个样的新对象，新创建的对象与原对象不共享内存，**新创建的对象在内存中开辟一个新的内存地址，新对象值修改时不会影响原对象值。既然内存地址不同，释放内存地址时，可分别释放。**
@@ -165,7 +197,6 @@ map中有增量扩容和等量扩容两种
 
   都是采取渐进式的扩容,不会立马将所有键值对迁移到新桶  
 
-
 ### 19.make和new什么区别?
 
 make 函数：
@@ -179,7 +210,7 @@ new 函数：
 
 ### 20.pprof怎么使用？什么是火焰图?
 
-https://segmentfault.com/a/1190000040670962
+<https://segmentfault.com/a/1190000040670962>
 
 ### 21.数组与切片的区别?
 
@@ -187,6 +218,7 @@ https://segmentfault.com/a/1190000040670962
 而切片是引用类型,是一个轻量级的数据结构,包含指向底层数组的指针,长度,容量,会在需要时发生扩容
 
 ### 22.beego和gin的区别?为什么gin比beego要快?
+
 1.Beego支持完整的MVC, Gin不支持完整的MVC（需要开发者自己实现MVC）
 2.Beego支持正则路由， Gin不支持正则路由
 3.Beego支持Session， Gin不支持Session(需要安装另外的包)
@@ -195,7 +227,7 @@ https://segmentfault.com/a/1190000040670962
 
 ### 23.defer的原理
 
-https://zhuanlan.zhihu.com/p/63354092  
+<https://zhuanlan.zhihu.com/p/63354092>  
 
 defer底层主要是两个函数:  
      `func deferproc(siz int32, fn *funcval)`和
@@ -240,7 +272,7 @@ Go中的CAS操作是借用了CPU提供的原子性指令来实现。CAS操作修
 
 ### 27.为何GPM调度要有P?
 
-https://segmentfault.com/a/1190000040092613  
+<https://segmentfault.com/a/1190000040092613>  
 
 最开始的go中只有G和M,M想要执行,放回G都必须访问全局队列,并且多线程访问同一资源需要加锁,主要有以下缺点:
 1.激烈的全局锁竞争
@@ -251,16 +283,15 @@ https://segmentfault.com/a/1190000040092613
 
 ### 28.什么是闭包？什么是闭包的延迟加载?
 
-https://www.bilibili.com/video/BV1hv411x7we?p=7
+<https://www.bilibili.com/video/BV1hv411x7we?p=7>
 
 闭包(Closure)通俗点讲就是能够访问外部函数内部变量的函数。像这样能被访问的变量通常被称为捕获变量。  
 
 ### 29.如何限制goroutine的数量?控制在多少个比较合适?
 
-https://segmentfault.com/a/1190000039773754  
+<https://segmentfault.com/a/1190000039773754>  
 
 可以设置有缓冲的channel,每个协程开启时时向channel中写入一个数据,利用有缓冲通道缓冲满时会阻塞的原理限制goroutine的数量
-
 
 ### 30.互斥锁有几种模式?
 
@@ -275,7 +306,7 @@ Go实现的互斥锁有两种模式，分别是正常模式和饥饿模式。
 
 ### 31.go中的逃逸分析是什么?
 
-https://zhuanlan.zhihu.com/p/343562181  
+<https://zhuanlan.zhihu.com/p/343562181>  
 
 编译器通过逃逸分析技术去选择堆或者栈，逃逸分析的基本思想如下：检查变量的生命周期是否是完全可知的，如果通过检查，则可以在栈上分配。否则，就是所谓的逃逸，必须在堆上进行分配.  
 
