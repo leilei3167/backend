@@ -9,6 +9,7 @@
 
 - [语言篇](#语言篇)
   - [参考](#参考)
+    - [LIST](#list)
     - [1.Golang中除了加Mutex锁以外还有哪些方式安全读写共享变量？](#1golang中除了加mutex锁以外还有哪些方式安全读写共享变量)
     - [2.无缓冲 Chan 的发送和接收是否同步?](#2无缓冲-chan-的发送和接收是否同步)
     - [3.GMP调度模型,尽可能的详细](#3gmp调度模型尽可能的详细)
@@ -49,12 +50,20 @@
     - [33.init的执行顺序](#33init的执行顺序)
     - [34.接口的内部实现](#34接口的内部实现)
     - [35. Go的内存管理原理](#35-go的内存管理原理)
+      - [管理模型](#管理模型)
+      - [逃逸分析](#逃逸分析)
+      - [GC](#gc)
 
 ## 参考
 
 [Go设计与实现](https://draveness.me/golang/)
 
 [Go修养之路](https://www.topgoer.cn/docs/golangxiuyang/golangxiuyang-1cmedc59gtgpi)
+
+### LIST
+
+- [ ] 内存管理3个角度分析
+- [ ] map原理深入理解
 
 ### 1.Golang中除了加Mutex锁以外还有哪些方式安全读写共享变量？
 
@@ -89,7 +98,7 @@ G代表的就是goroutine,M代表的是内核线程,P代表的是GM运行所需�
 
 <https://zhuanlan.zhihu.com/p/471490292>
 
-- G的状态：
+- G的状态(8种)：
 
 _Gidle：刚刚被分配并且还没有被初始化，值为0，为创建goroutine后的默认值
 
@@ -107,7 +116,7 @@ _Gcopystac：栈正在被拷贝，没有执行代码，不在运行队列上，�
 
 _Gscan ： GC 正在扫描栈空间，没有执行代码，可以与其他状态同时存在。
 
-- P的状态：
+- P的状态(5种)：
 
 _Pidle ：处理器没有运行用户代码或者调度器，被空闲队列或者改变其状态的结构持有，运行队列为空
 
@@ -127,7 +136,39 @@ _Pdead ：当前处理器已经不被使用
 
 #### 3.2 抢占式调度的过程
 
+<https://www.cnblogs.com/luozhiyun/p/14589730.html>
+
+在 Go 的 1.14 版本之前抢占试调度都是基于协作的，需要自己主动的让出执行，但是这样是无法处理一些无法被抢占的边缘情况。  
+例如：for 循环或者垃圾回收长时间占用线程，这些问题中的一部分直到 1.14 才被**基于信号的抢占式调度**解决。
+
+基于协作的抢占式调度的工作机制就是：
+
+- **编译器会在调用函数前插入 runtime.morestack，可能会调用runtime.newstack进行抢占**
+- Go 语言运行时会在垃圾回收暂停程序、系统监控发现 Goroutine 运行超过 10ms 时发出抢占请求 StackPreempt
+- 当发生函数调用时，可能会执行编译器插入的 runtime.morestack，它调用的 runtime.newstack会检查 Goroutine 的 stackguard0 字段是否为 StackPreempt；
+- 如果 stackguard0 是 StackPreempt，就会触发抢占让出当前线程；
+但是这种调度并不完备，**比如一个goroutine运行了很久，但是它并没有调用另一个函数，则它不会被抢占**
+
+基于信号的抢占式调度:  
+
+在之前的依赖栈增长检测代码的方式，遇到没有函数调用的情况下就会出现问题，在Go1.14这一问题得到解决。
+在Linux中这种真正的抢占式调度是基于信号完成的，所以也称为“异步抢占”
+
+- **M 注册一个 `SIGURG` 信号的处理函数：sighandler。**
+
+- `sysmon` 线程检测到执行时间过长的 goroutine 或者GC stw 时，会向相应的 M（或者说线程，每个线程对应一个 M）发送 `SIGURG` 信号。
+
+- 收到信号后，内核执行 sighandler 函数，通过 pushCall 插入 asyncPreempt 函数调用。
+
+- 回到当前 goroutine 执行 asyncPreempt 函数，通过 mcall 切到 g0 栈执行 gopreempt_m。
+
+- 将当前 goroutine 插入到全局可运行队列，M 则继续寻找其他 goroutine 来运行。
+
+- 被抢占的 goroutine 再次调度过来执行时，会继续原来的执行流。
+
 #### 3.3 若干线程中其中一个发生OOM(Out Of Memory)会怎么样?如果是若干个goroutine呢?
+
+如果线程发生OOM，也就是内存溢出，发生OOM的线程会被kill掉，其它线程不受影响。
 
 ### 4.JSON 标准库对 nil slice 和 空 slice 的处理是一致的吗？
 
@@ -299,7 +340,7 @@ map不是并发安全的;
 map在go中底层是用拉链法实现的哈希表,发生哈希冲突时,用链表来解决;map底层是若干个结构为bmap的bucket组成
 的数组,每个bucket就是一个链表;bmap就是我们所说的桶,bmap最多能存放8个键值对,超出的话将会链接到一个新的bucket
 即溢出桶
-map中有增量扩容和等量扩容两种
+**map中有增量扩容和等量扩容两种**
     map扩容的条件:
             - **当负载因子(键的数量/bucket的数量)>6.5的时候:**
                 代表元素太多,桶太少,翻倍扩容,要注意翻倍扩容后,值不会立刻迁入到新桶
@@ -460,4 +501,16 @@ Pool用来保存和复用临时对象,减少内存分配,降低GC压力;
 
 ### 35. Go的内存管理原理
 
-TODO:
+<https://blog.csdn.net/u013616005/article/details/120463299>
+<https://zhuanlan.zhihu.com/p/360306642>
+<https://zhuanlan.zhihu.com/p/29216091>
+
+参考`tcmalloc`实现,从3个方面看Go的内存管理设计
+
+#### 管理模型
+
+就是一个内存池, 只不过内部做了很多的优化. 比如自动伸缩内存池大小, 合理的切割内存块等等.
+
+#### 逃逸分析
+
+#### GC
