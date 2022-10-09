@@ -49,16 +49,26 @@
     - [32.sync.Pool用过吗?是怎么用的?](#32syncpool用过吗是怎么用的)
     - [33.init的执行顺序](#33init的执行顺序)
     - [34.接口的内部实现](#34接口的内部实现)
-    - [35. Go的内存管理原理](#35-go的内存管理原理)
+    - [35.Go的内存管理原理](#35go的内存管理原理)
       - [管理模型](#管理模型)
       - [逃逸分析](#逃逸分析)
       - [GC](#gc)
+    - [36.什么是内存对齐?为什么要有内存对齐?](#36什么是内存对齐为什么要有内存对齐)
+    - [37.defer的原理?](#37defer的原理)
+    - [38.删除切片中间某个元素?](#38删除切片中间某个元素)
+    - [39.使用一个字符串名称调用函数](#39使用一个字符串名称调用函数)
+    - [string转为byte切片是否会发生内存分配?如何避免内存分配?](#string转为byte切片是否会发生内存分配如何避免内存分配)
+    - [40.两个goroutin交替打印](#40两个goroutin交替打印)
 
 ## 参考
 
 [Go设计与实现](https://draveness.me/golang/)
 
 [Go修养之路](https://www.topgoer.cn/docs/golangxiuyang/golangxiuyang-1cmedc59gtgpi)
+
+[面试题汇总1](https://www.topgoer.cn/docs/interview/interview-1dks8a8s7sevg)
+
+[面试题汇总2](https://github.com/KeKe-Li/data-structures-questions/blob/master/src/chapter05/golang.01.md#G0%E7%9A%84%E4%BD%9C%E7%94%A8)
 
 ### LIST
 
@@ -137,6 +147,8 @@ _Pdead ：当前处理器已经不被使用
 #### 3.2 抢占式调度的过程
 
 <https://www.cnblogs.com/luozhiyun/p/14589730.html>
+
+GC时需要STW,也就是需要抢占所有的P,让他们停止工作,对于当前的P,系统调用的P,空闲的P直接设置为_gcstop即可,对于还有G在运行的P
 
 在 Go 的 1.14 版本之前抢占试调度都是基于协作的，需要自己主动的让出执行，但是这样是无法处理一些无法被抢占的边缘情况。  
 例如：for 循环或者垃圾回收长时间占用线程，这些问题中的一部分直到 1.14 才被**基于信号的抢占式调度**解决。
@@ -438,6 +450,7 @@ Go中的CAS操作是借用了CPU提供的原子性指令来实现。CAS操作修
 <https://www.bilibili.com/video/BV1hv411x7we?p=7>
 
 闭包(Closure)通俗点讲就是能够访问外部函数内部变量的函数。像这样能被访问的变量通常被称为捕获变量。  
+闭包的延迟简而言之就是闭包返回的内层函数不会立即执行, 而是在使用时候才执行
 
 ### 29.如何限制goroutine的数量?控制在多少个比较合适?
 
@@ -464,8 +477,8 @@ Go实现的互斥锁有两种模式，分别是正常模式和饥饿模式。
 
 发生逃逸的几种情况:  
 
-    1. 变量类型不确定
-    2. 暴露给外部指针(变量在函数外部存在引用,如函数内部创建的变量返回值为该变量的指针)
+    1. 操作类型不确定的变量(空接口)
+    2. 变量被外部引用(变量在函数外部存在引用,如函数内部创建的变量返回值为该变量的指针)
     3. 变量所占内存巨大
 
 Go语言虽然没有明确说明逃逸分析规则，但是有以下几点准则，是可以参考的:  
@@ -499,7 +512,7 @@ Pool用来保存和复用临时对象,减少内存分配,降低GC压力;
 接口类型由两种表示方式:`iface`和`eface`,前者表示拥有方法的列表的接口,后者表示空接口类型,2者均具有2个指针字段,并且由一个指针功能相同:**指向当前赋值给该接口的动态类型变量的值**,不同点在于eface没有方法列表,因此其另一个指针指向一个`_type`结构,该结构为该接口类型变量的动态类型的信息  
 而iface除了要存动态类型的信息之外,还有存放接口本身的信息(接口的类型信息,方法列表等),因此iface第一个字段是指向`itab`类型的指针,`itab`中同样有`_type`存放动态类型信息,`inter`存放接口自身的信息(类型,包路径,接口方法集合切片),`fun`中是已实现接口方法的调用地址的数组(容量为1,第一个方法的指针)
 
-### 35. Go的内存管理原理
+### 35.Go的内存管理原理
 
 <https://blog.csdn.net/u013616005/article/details/120463299>
 <https://zhuanlan.zhihu.com/p/360306642>
@@ -511,6 +524,164 @@ Pool用来保存和复用临时对象,减少内存分配,降低GC压力;
 
 就是一个内存池, 只不过内部做了很多的优化. 比如自动伸缩内存池大小, 合理的切割内存块等等.
 
+- 概念
+  - `page`:内存页,一块8k大小的内存空间,Go和OS之间的内存申请和释放都是以page为单位的
+  - `span`:内存块,一个或多个连续的`page`组成一个span
+  - `sizeclass`: 空间规格, 每个 span 都带有一个 sizeclass , **标记着该 span 中的 page 应该如何使用**.
+  - `object`: 对象, 用来存储一个变量数据内存空间, **一个 span 在初始化时,会被切割成一堆等大的object**. 假设 object 的大小是 16B, span 大小是 8K, 那么就会把span中的 page 就会被初始化 8K / 16B = 512 个 object . 所谓内存分配, 就是分配一个 object 出去.
+  - `内存碎片`:系统(OS/各种runtime)在内存管理过程中, 会不可避免的出现**一块块无法被使用的内存空间**, 这就是内存管理的产物.
+  - `内部碎片`:一般都是因为字节对齐; 为了字节对齐, 会导致一部分空间直接被放弃掉, 不做分配使用.
+  - `外部碎片`:一般时因为内存的不断分配和释放, 导致一些释放的小内存块分散在内存各处, 无法被用以分配. 不过Go的内存管理机制不会引起大量外部碎片.
+
 #### 逃逸分析
 
 #### GC
+
+### 36.什么是内存对齐?为什么要有内存对齐?
+
+<https://geektutu.com/post/hpg-struct-alignment.html>
+
+CPU 访问内存时，并不是逐个字节访问，而是以字长（word size）为单位访问。比如 32 位的 CPU ，字长为 4 字节，那么 CPU 访问内存的单位也是 4 字节。  
+这么设计的目的，是减少 CPU 访问内存的次数，加大 CPU 访问内存的吞吐量。比如同样读取 8 个字节的数据，一次读取 4 个字节那么只需要读取 2 次。
+CPU 始终以字长访问内存，如果不进行内存对齐，很可能增加 CPU 访问内存的次数
+
+### 37.defer的原理?
+
+### 38.删除切片中间某个元素?
+
+```go
+func delete(arr []int, n int) []int {
+    if n > len(arr)-1 || n < 0 {
+         panic("out of index")
+    }
+
+    copy(arr[n:], arr[n+1:]) //利用copy
+
+    return arr[:len(arr)-1]
+}
+```
+
+### 39.使用一个字符串名称调用函数
+
+```go
+type Animal struct {
+}
+
+func (m *Animal) Eat() {
+    fmt.Println("Eat")
+}
+func main() {
+    animal := Animal{}
+    value := reflect.ValueOf(&animal)
+    f := value.MethodByName("Eat") //通过反射获取它对应的函数，然后通过call来调用
+    f.Call([]reflect.Value{})
+}
+
+```
+
+### string转为byte切片是否会发生内存分配?如何避免内存分配?
+
+<https://zhuanlan.zhihu.com/p/270626496>
+
+有两种转换方式
+
+- 标准转换(最常用)
+
+```go
+   s1 := "hello"
+    b := []byte(s1)
+
+    // []byte to string
+    s2 := string(b)
+```
+
+- 强制转换(unsafe)
+
+```go
+  func String2Bytes(s string) []byte {
+    sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
+    bh := reflect.SliceHeader{
+        Data: sh.Data,
+        Len:  sh.Len,
+        Cap:  sh.Len,
+    }
+  return*(*[]byte)(unsafe.Pointer(&bh))
+}
+
+  func Bytes2String(b []byte) string {
+    return *(*string)(unsafe.Pointer(&b))
+    }
+
+```
+
+使用unsafe.Pointer可以避免内存分配
+
+其中**强制转换的性能明显好于标准转换**
+
+1. 为啥强转换性能会比标准转换好？
+
+2. 当数据较大时，标准转换方式会有一次分配内存的操作，从而导致其性能更差，而强转换方式却不受影响？
+
+3. 既然强转换方式性能这么好，为啥go语言提供给我们使用的是标准转换方式？
+
+### 40.两个goroutin交替打印
+
+```go
+func main() {
+ c := make(chan int)
+ go func() {
+  for i := 1; i < 101; i++ {
+   c <- 1
+   //奇数
+   if i%2 == 1 {
+    fmt.Println("线程1打印:",i)
+   }
+  }
+ }()
+ go func() {
+  for i := 1; i < 101; i++ {
+   <- c
+   //偶数
+   if i%2 == 0 {
+    fmt.Println("线程2打印:",i)
+   }
+  }
+ }()
+ time.Sleep(3 * time.Second)
+}
+```
+
+交替打印数字和字母
+
+```go
+func main() {
+        number, letter := make(chan bool), make(chan bool)
+        wait := sync.WaitGroup{}
+        go func() {
+                i := 1
+                for {
+            <- number
+                        fmt.Printf("%d%d", i, i + 1)
+                        i += 2
+                        letter <- true
+                }
+        }()
+        wait.Add(1)
+        go func(wait *sync.WaitGroup) {
+                str := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                i := 0
+                for {
+                        <- letter
+                        if i >= utf8.RuneCountInString(str) {
+                                wait.Done()
+                                return
+                        }
+                        fmt.Print(str[i : i+2])
+                        i += 2
+                        number <- true
+                }
+        }(&wait)
+        number <- true
+        wait.Wait()
+}
+```
