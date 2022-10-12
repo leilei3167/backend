@@ -70,6 +70,8 @@
 
 [面试题汇总2](https://github.com/KeKe-Li/data-structures-questions/blob/master/src/chapter05/golang.01.md#G0%E7%9A%84%E4%BD%9C%E7%94%A8)
 
+[面试解析](https://github.com/lifei6671/interview-go)
+
 ### LIST
 
 - [ ] 内存管理3个角度分析
